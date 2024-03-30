@@ -1,0 +1,133 @@
+﻿<script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue-jwt-decode@0.1.0/dist/lib/vue-jwt-decode.min.js"></script>
+
+<div id="user-info">
+    <template v-if="userData">
+        <div class="dropdown">
+            <button class="dropdown-button">{{ userName }}</button>
+            <div class="dropdown-menu">
+                <div class="dropdown-menu-item">Settings</div>
+                <div class="dropdown-menu-item" v-on:click="logout">Logout</div>
+            </div>
+        </div>
+    </template>
+    <template v-else>
+        <div id="button-container">
+            <button class="button-7" role="button" v-on:click="login">Login</button>
+            <button class="button-7" role="button" v-on:click="register">Register</button>
+        </div>
+
+    </template>
+</div>
+<div id="default-route-url" data-url="@Url.Action("Login", "Home")"></div>
+<style>
+    #button-container {
+        display: flex; 
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+    }
+    .button-7 {
+        background-color: #0276FF;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        box-shadow: rgba(255, 255, 255, .4) 0 1px 0 0 inset;
+        box-sizing: border-box;
+        color: #fff;
+        cursor: pointer;
+        display: inline-block;
+        font-family: -apple-system,system-ui,"Segoe UI","Liberation Sans",sans-serif;
+        font-size: 13px;
+        font-weight: 400;
+        line-height: 1.15385;
+        margin: 0;
+        outline: none;
+        padding: 8px .8em;
+        position: relative;
+        text-align: center;
+        text-decoration: none;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+        vertical-align: baseline;
+        white-space: nowrap;
+    }
+
+    .button-7:hover,
+    .button-7:focus {
+        background-color: #07c;
+    }
+
+    .button-7:focus {
+        box-shadow: 0 0 0 4px rgba(0, 149, 255, .15);
+    }
+
+    .button-7:active {
+        background-color: #0064bd;
+        box-shadow: none;
+    }
+    .dropdown {
+        position: relative;
+        display: inline-block;
+    }
+
+    .dropdown-button {
+        background-color: #0276FF;
+        color: #fff;
+        border: none;
+        border-radius: 3px;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        min-width: 120px;
+        z-index: 1;
+        top: 100%;
+        right: 0;
+    }
+
+    .dropdown-menu-item {
+        padding: 8px 12px;
+        text-align: left;
+        cursor: pointer;
+    }
+
+        .dropdown-menu-item:hover {
+            background-color: #0276FF;
+            color: #fff;
+        }
+
+    .dropdown:hover .dropdown-menu {
+        display: block;
+    }
+</style>
+<script>
+    var app = new Vue({
+        el: '#user-info',
+        data: {
+            errorMessage: '',
+            userData: JSON.parse(localStorage.getItem('userData')),
+            userName: localStorage.getItem('username')
+        },
+        methods: {
+            login: function () {
+                var defaultRouteUrl = document.getElementById('default-route-url').getAttribute('data-url');
+                window.location.href = defaultRouteUrl;
+            },
+            logout: function () {
+                localStorage.removeItem('username');
+                localStorage.removeItem('userData');
+                var defaultRouteUrl = document.getElementById('default-route-url').getAttribute('data-url');
+                window.location.href = defaultRouteUrl;
+            },
+            register: function () {
+                window.location.href = 'Register';
+            }
+        } 
+    });
+</script>

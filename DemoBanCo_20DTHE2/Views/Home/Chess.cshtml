@@ -1,0 +1,435 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<script src="~/js/signalr/dist/browser/signalr.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+
+<style>
+    .chessboard {
+        width: 850px;
+        height: 850px;
+        background-image: url("/Images/bancotuong.jpg");
+        position: absolute;
+    }
+
+    .chessnode {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+    }
+
+    .chessimgnode {
+        width: 50px;
+        height: 50px;
+    }
+
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        max-height: 400px; /* Chiều cao tối đa của khung chat */
+        border: 1px solid #ccc;
+        border-radius: 10px; /* Đưa ra viền cong */
+        overflow: hidden;
+    }
+
+    /* Cuộn nội dung tin nhắn */
+    .chat-messages {
+        overflow-y: auto;
+        flex-grow: 1;
+        padding: 10px;
+        background-color: #f5f5f5; /* Màu nền của tin nhắn */
+        border-radius: 10px; /* Đưa ra viền cong */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Đổ bóng khung chat */
+    }
+
+    /* Giao diện nhập tin nhắn */
+    .chat-input {
+        padding: 10px;
+        background-color: #fff; /* Màu nền của ô nhập tin */
+        border: 1px solid #ccc;
+        border-radius: 10px; /* Đưa ra viền cong */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Đổ bóng khung chat */
+    }
+</style>
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 chess-container">
+            <div id="app" style="min-height: 800px">
+                <template v-if="userData">
+                    <div class="chessboard">
+                        <div v-for="item in chessNode" class="chessnode"
+                             v-on:dragstart="dragStart"
+                             v-on:dragend="dragEnd"
+                             :id="item.id" v-bind:style="{ display: item.visible, top: item.top + 'px', left: item.left + 'px' }">
+                            <img :src="'/' + item.src" class="chessimgnode" />
+                        </div>
+                    </div>
+                </template>
+                <template v-else>
+                    <button v-on:click="login">Login to play the game</button>
+                </template>
+            </div>
+        </div>
+        <div class="col-lg-4 chat-container">
+            <div class="chat-messages">
+                <ul id="messagesList"></ul>
+            </div>
+            <div class="chat-input">
+                <div class="row p-1 d-none">
+                    <div class="col-2">User</div>
+                    <div class="col-10"><input type="text" id="userInput" class="form-control" /></div>
+                </div>
+                <div class="row p-1">
+                    <div class="col-2">Message</div>
+                    <div class="col-10"><input type="text" id="messageInput" class="form-control" /></div>
+                </div>
+                <div class="row p-1">
+                    <div class="col-12 text-end">
+                        <input type="button" id="sendButton" value="Send Message" class="btn btn-primary" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="~/js/signalr/dist/browser/signalr.js"></script>
+<script src="~/js/chat.js"></script>
+
+<div id="default-route-url" data-url="@Url.Action("Login", "Home")"></div>
+<script>
+    const userName = localStorage.getItem('username');
+    const userInput = document.querySelector('#userInput');
+    userInput.value = userName;
+    var matrix = [];
+    var app = new Vue({
+        el: '#app',
+        data: {
+            chessNode: [],
+            top: 0,
+            left: 0,
+            userData: JSON.parse(localStorage.getItem('userData')),
+        },
+        methods: {
+            getChessNodes() {
+                axios({
+                    url: '/api/chess/loadChessBoard',
+                    method: 'GET',
+                    responseType: 'Json',
+
+                }).then((response) => {
+                    this.chessNode = response.data.chessNode;
+                    matrix = response.data.matrix;
+
+                });
+            },
+            getIndexByTopLeft(top, left, matrix) {
+                var obj = {};
+                for (var i = 0; i < matrix.length; i++) {
+                    for (var j = 0; j < matrix[i].length; j++) {
+                        if (Math.abs(matrix[i][j].top - top) < 20 && Math.abs(matrix[i][j].left - left) < 20) {
+                            obj.i = i;
+                            obj.j = j;
+                            obj.id = matrix[i][j].id;
+                            return obj;
+                        }
+                    }
+                }
+                return null;
+            },
+            dragStart(event) {
+
+                this.top = event.clientY;
+                this.left = event.clientX;
+            },
+            dragEnd(event) {
+                var id = event.currentTarget.id;
+                var moveLeft = event.clientX - this.left;
+                var moveTop = event.clientY - this.top;
+
+                moveLeft = moveLeft + event.currentTarget.offsetLeft;
+                moveTop = moveTop + event.currentTarget.offsetTop;
+                var nodeStart = this.getIndexByTopLeft(event.currentTarget.offsetTop, event.currentTarget.offsetLeft, matrix);
+                var nodeEnd = this.getIndexByTopLeft(moveTop, moveLeft, matrix);
+
+                if (nodeEnd == null) {
+                    return;
+
+                }
+                var maxtrixNodeEnd = matrix[nodeEnd.i][nodeEnd.j];
+                var removeNode = null;
+                if (id.indexOf("ma") >= 0) {
+                    var gapI = Math.abs(nodeEnd.i - nodeStart.i);
+                    var gapJ = Math.abs(nodeEnd.j - nodeStart.j);
+                    if (!((gapI == 1 && gapJ == 2) || (gapI == 2 && gapJ == 1))) {
+                        return;
+                    }
+                    if (maxtrixNodeEnd.id != "") {
+                        if ((id.indexOf("do") >= 0 && maxtrixNodeEnd.id.indexOf("do") >= 0)
+                            || (id.indexOf("den") >= 0 && maxtrixNodeEnd.id.indexOf("den") >= 0)) {
+                            return;
+                        }
+                        removeNode = {};
+                        removeNode.id = maxtrixNodeEnd.id;
+                    }
+                    if (gapJ == 1) {
+                        if (nodeEnd.i > nodeStart.i && matrix[nodeStart.i + 1][nodeStart.j].id != "") {
+                            return;
+                        }
+                        if (nodeEnd.i < nodeStart.i && matrix[nodeStart.i - 1][nodeStart.j].id != "") {
+                            return;
+                        }
+                    }
+                    if (gapI == 1) {
+                        if (nodeEnd.j < nodeStart.j && matrix[nodeStart.i][nodeStart.j - 1].id != "") {
+                            return;
+                        }
+                        if (nodeEnd.j > nodeStart.j && matrix[nodeStart.i][nodeStart.j + 1].id != "") {
+                            return;
+                        }
+                    }
+                }
+                //vua
+                if (id.indexOf("vua") >= 0) {
+                    var gapI = Math.abs(nodeEnd.i - nodeStart.i);
+                    var gapJ = Math.abs(nodeEnd.j - nodeStart.j);
+                    if (!((nodeEnd.j >= 3 && nodeEnd.j <= 5 && nodeEnd.i <= 2) || (nodeEnd.j >= 3 && nodeEnd.j <= 5 && nodeEnd.i >= 7))) {
+                        return;
+                    }
+                    if (!((gapI == 0 && gapJ == 1) || (gapI == 1 && gapJ == 0))) {
+                        return;
+                    }
+                    var flag = true;
+
+                    if (maxtrixNodeEnd.id != "") {
+                        if ((id.indexOf("do") >= 0 && maxtrixNodeEnd.id.indexOf("do") >= 0)
+                            || (id.indexOf("den") >= 0 && maxtrixNodeEnd.id.indexOf("den") >= 0)) {
+                            return;
+                        }
+                        removeNode = {};
+                        removeNode.id = maxtrixNodeEnd.id;
+                    }
+                }
+                //xe
+                if (id.indexOf("xe") >= 0) {
+                    var gapI = Math.abs(nodeEnd.i - nodeStart.i);
+                    var gapJ = Math.abs(nodeEnd.j - nodeStart.j);
+                    if (!((gapI >= 1 && gapJ == 0) || (gapI == 0 && gapJ >= 1))) {
+                        return;
+                    }
+                    var flag = true;
+                    if (maxtrixNodeEnd.id != "") {
+                        if ((id.indexOf("do") >= 0 && maxtrixNodeEnd.id.indexOf("do") >= 0)
+                            || (id.indexOf("den") >= 0 && maxtrixNodeEnd.id.indexOf("den") >= 0)) {
+                            return;
+                        }
+                        removeNode = {};
+                        removeNode.id = maxtrixNodeEnd.id;
+                    }
+                    if (gapJ >= 1) {
+                        var minJ = Math.min(nodeStart.j, nodeEnd.j);
+                        var maxJ = Math.max(nodeStart.j, nodeEnd.j);
+                        for (let j = minJ + 1; j < maxJ; j++) {
+                            if (nodeEnd.j < nodeStart.j && matrix[nodeStart.i][j].id != "") {
+                                return;
+                            }
+                            if (nodeEnd.j > nodeStart.j && matrix[nodeStart.i][j].id != "") {
+                                return;
+                            }
+                        }
+                    }
+                    if (gapI >= 1) {
+                        var minI = Math.min(nodeStart.i, nodeEnd.i);
+                        var maxI = Math.max(nodeStart.i, nodeEnd.i);
+                        for (let i = minI + 1; i < maxI; i++) {
+                            if (nodeEnd.i < nodeStart.i && matrix[i][nodeStart.j].id != "") {
+                                return;
+                            }
+                            if (nodeEnd.i > nodeStart.i && matrix[i][nodeStart.j].id != "") {
+                                return;
+                            }
+                        }
+
+                    }
+
+                }
+                //phao
+                if (id.indexOf("phao") >= 0) {
+                    var gapI = Math.abs(nodeEnd.i - nodeStart.i);
+                    var gapJ = Math.abs(nodeEnd.j - nodeStart.j);
+
+                    // Kiểm tra xem quân pháo có thể di chuyển theo luật của nó
+                    if (!((gapI >= 1 && gapJ == 0) || (gapI == 0 && gapJ >= 1))) {
+                        return;
+                    }
+
+                    // Biến flag không được sử dụng trong đoạn mã này, có thể loại bỏ nếu không cần thiết
+                    // var flag = true;
+
+                    if (maxtrixNodeEnd.id != "") {
+                        // Kiểm tra xem quân pháo có thể nhảy qua quân cờ để ăn quân đối phương
+
+                        var minI = Math.min(nodeStart.i, nodeEnd.i);
+                        var maxI = Math.max(nodeStart.i, nodeEnd.i);
+                        var minJ = Math.min(nodeStart.j, nodeEnd.j);
+                        var maxJ = Math.max(nodeStart.j, nodeEnd.j);
+
+                        // Đếm số quân cờ nằm trên đường giữa quân pháo và vị trí đích (nodeEnd)
+                        var obstacleCount = 0;
+
+                        if (gapI == 0) {
+                            for (let j = minJ + 1; j < maxJ; j++) {
+                                if (matrix[nodeStart.i][j].id != "") {
+                                    obstacleCount++;
+                                }
+                            }
+                        } else {
+                            for (let i = minI + 1; i < maxI; i++) {
+                                if (matrix[i][nodeStart.j].id != "") {
+                                    obstacleCount++;
+                                }
+                            }
+                        }
+
+                        // Nếu có chính xác một quân cờ nằm giữa quân pháo và vị trí đích (nodeEnd),
+                        // quân pháo có thể ăn quân cờ đối phương và xóa nó
+                        if (obstacleCount === 1) {
+                            removeNode = {};
+                            removeNode.id = maxtrixNodeEnd.id;
+                        } else {
+                            return; // Nếu không, không cho phép di chuyển
+                        }
+                    }
+                }
+                if (id.indexOf("si") >= 0) {
+                    var gapI = Math.abs(nodeEnd.i - nodeStart.i);
+                    var gapJ = Math.abs(nodeEnd.j - nodeStart.j);
+                    if (!((nodeEnd.j >= 3 && nodeEnd.j <= 5 && nodeEnd.i <= 2) || (nodeEnd.j >= 3 && nodeEnd.j <= 5 && nodeEnd.i >= 7))) {
+                        return;
+                    }
+                    if (!(gapI == 1 && gapJ == 1)) {
+                        return;
+                    }
+                    var flag = true;
+                    if (maxtrixNodeEnd.id != "") {
+                        if ((id.indexOf("do") >= 0 && maxtrixNodeEnd.id.indexOf("do") >= 0)
+                            || (id.indexOf("den") >= 0 && maxtrixNodeEnd.id.indexOf("den") >= 0)) {
+                            return;
+                        }
+                        removeNode = {};
+                        removeNode.id = maxtrixNodeEnd.id;
+                    }
+                }
+                //tot
+                if (id.indexOf("tot") >= 0) {
+                    var gapI = nodeEnd.i - nodeStart.i;
+                    var gapJ = nodeEnd.j - nodeStart.j;
+                    if (id.indexOf("do") >= 0) {
+                        if (!(((nodeEnd.i <= 4) && (gapI == 1 && gapJ == 0)) || ((nodeEnd.i > 4) && ((gapI == 1 && gapJ == 0) || (gapI == -1 && gapJ == 0) || (gapI == 0 && gapJ == 1) || (gapI == 0 && gapJ == -1))))) {
+                            return;
+                        }
+                    }
+                    if (id.indexOf("den") >= 0) {
+                        if (!(((nodeEnd.i >= 5) && (gapI == -1 && gapJ == 0)) || ((nodeEnd.i < 5) && ((gapI == 1 && gapJ == 0) || (gapI == -1 && gapJ == 0) || (gapI == 0 && gapJ == 1) || (gapI == 0 && gapJ == -1))))) {
+                            return;
+                        }
+                    }
+                    var flag = true;
+                    if (maxtrixNodeEnd.id != "") {
+                        if ((id.indexOf("do") >= 0 && maxtrixNodeEnd.id.indexOf("do") >= 0)
+                            || (id.indexOf("den") >= 0 && maxtrixNodeEnd.id.indexOf("den") >= 0)) {
+                            return;
+                        }
+                        removeNode = {};
+                        removeNode.id = maxtrixNodeEnd.id;
+                    }
+                }
+                //tượng
+                if (id.indexOf("tuong") >= 0) {
+                    var gapI = Math.abs(nodeEnd.i - nodeStart.i);
+                    var gapJ = Math.abs(nodeEnd.j - nodeStart.j);
+                    if (!(gapI == 2 && gapJ == 2)) {
+                        return;
+                    }
+                    var flag = true;
+
+                    if (maxtrixNodeEnd.id != "") {
+                        if ((id.indexOf("do") >= 0 && maxtrixNodeEnd.id.indexOf("do") >= 0)
+                            || (id.indexOf("den") >= 0 && maxtrixNodeEnd.id.indexOf("den") >= 0)) {
+                            return;
+                        }
+                        removeNode = {};
+                        removeNode.id = matrixNodeEnd.id;
+                    }
+                    if (id.indexOf("do") >= 0) {
+                        if (!((nodeEnd.i <= 5))) {
+                            return;
+                        }
+                    }
+                    if (id.indexOf("den") >= 0) {
+                        if (!((nodeEnd.i >= 5))) {
+                            return;
+                        }
+                    }
+                    if (gapI == 2 && gapJ == 2) {
+                        if (nodeEnd.i > nodeStart.i && matrix[nodeStart.i + 1][nodeStart.j + 1].id != "") {
+                            return;
+                        }
+                        if (nodeEnd.i > nodeStart.i && matrix[nodeStart.i + 1][nodeStart.j - 1].id != "") {
+                            return;
+                        }
+                        if (nodeEnd.i < nodeStart.i && matrix[nodeStart.i - 1][nodeStart.j - 1].id != "") {
+                            return;
+                        }
+                        if (nodeEnd.i < nodeStart.i && matrix[nodeStart.i - 1][nodeStart.j + 1].id != "") {
+                            return;
+                        }
+                    }
+                }
+                var para = [{ id: id, fromi: nodeStart.i, fromj: nodeStart.j, toi: nodeEnd.i, toj: nodeEnd.j }];
+                if (removeNode != null) {
+                    para.push(removeNode);
+                }
+                axios({
+                    url: '/api/chess/movechess',
+                    method: 'POST',
+                    responseType: 'Json',
+                    data: para
+
+                }).then((response) => {
+
+
+                });
+
+
+            }, login: function () {
+                var defaultRouteUrl = document.getElementById('default-route-url').getAttribute('data-url');
+                window.location.href = defaultRouteUrl;
+            },
+        },
+        mounted: function () {
+            this.getChessNodes();
+            var connection = new signalR.HubConnectionBuilder().withUrl("/chatHub").build();
+            connection.on("ReceiveChessMove", function (message) {
+                console.log(message);
+                var res = JSON.parse(message);
+                var obj = document.getElementById(res[0].id);
+
+                var nodeEnd = matrix[res[0].toi][res[0].toj];
+
+                obj.style.top = nodeEnd.top + 'px';
+                obj.style.left = nodeEnd.left + 'px';
+
+                matrix[res[0].fromi][res[0].fromj].id = "";
+                matrix[res[0].toi][res[0].toj].id = res[0].id;
+                if (res.length > 1) {
+                    var temp = document.getElementById(res[1].id);
+                    temp.style.display = "none";
+                }
+            });
+            connection.start();
+        }
+    });
+</script>

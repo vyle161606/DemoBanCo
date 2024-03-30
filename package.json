@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "vue-jwt-decode": "^0.1.0"
+  }
+}
